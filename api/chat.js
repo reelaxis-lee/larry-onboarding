@@ -73,12 +73,17 @@ module.exports = async function handler(req, res) {
 
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+  // On first load, messages is empty — seed with a trigger so Claude opens the conversation
+  const conversationMessages = messages.length === 0
+    ? [{ role: 'user', content: 'Hello, I\'d like to get my LinkedIn account set up.' }]
+    : messages;
+
   try {
     const response = await anthropic.messages.create({
       model: 'claude-opus-4-5',
       max_tokens: 1024,
       system: SYSTEM_PROMPT,
-      messages,
+      messages: conversationMessages,
     });
 
     const reply = response.content[0].text;
