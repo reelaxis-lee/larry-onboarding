@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedIn Automation Setup</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .chat-wrapper {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      height: 90vh;
+      max-height: 820px;
+    }
+
+    .chat-header {
+      background: #0a66c2;
+      color: white;
+      padding: 18px 24px;
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .chat-header .avatar {
+      width: 40px;
+      height: 40px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .chat-header .title { font-size: 16px; font-weight: 600; }
+    .chat-header .subtitle { font-size: 13px; opacity: 0.8; margin-top: 2px; }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px 20px;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      max-width: 88%;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+
+    .message .bubble {
+      padding: 12px 16px;
+      border-radius: 18px;
+      line-height: 1.5;
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .message.assistant .bubble {
+      background: #f0f2f5;
+      color: #1c1e21;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.user .bubble {
+      background: #0a66c2;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message .msg-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #0a66c2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+
+    .message.user .msg-avatar { background: #e0e0e0; color: #555; }
+
+    .typing-indicator {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .typing-dots {
+      display: flex;
+      gap: 4px;
+      padding: 12px 16px;
+      background: #f0f2f5;
+      border-radius: 18px;
+      border-bottom-left-radius: 4px;
+    }
+
+    .typing-dots span {
+      width: 8px;
+      height: 8px;
+      background: #999;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    .chat-input-area {
+      background: white;
+      border-top: 1px solid #e4e6eb;
+      padding: 16px;
+      border-radius: 0 0 16px 16px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .chat-input-area textarea {
+      flex: 1;
+      border: 1.5px solid #ddd;
+      border-radius: 20px;
+      padding: 10px 16px;
+      font-size: 15px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      min-height: 42px;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+
+    .chat-input-area textarea:focus { border-color: #0a66c2; }
+
+    .chat-input-area button {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: #0a66c2;
+      border: none;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+
+    .chat-input-area button:hover { background: #004182; }
+    .chat-input-area button:disabled { background: #ccc; cursor: not-allowed; }
+
+    .complete-banner {
+      background: #e6f4ea;
+      border: 1px solid #34a853;
+      color: #1e7e34;
+      padding: 14px 18px;
+      margin: 0 20px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+
+    .complete-banner.show { display: block; }
+
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div class="chat-wrapper">
+    <div class="chat-header">
+      <div class="avatar">🔗</div>
+      <div>
+        <div class="title">LinkedIn Automation Setup</div>
+        <div class="subtitle">Answer a few questions to get your account configured</div>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="messages"></div>
+
+    <div class="complete-banner" id="completeBanner">
+      ✅ Setup complete! Your profile has been sent to the team. You'll hear from us shortly about next steps.
+    </div>
+
+    <div class="chat-input-area">
+      <textarea
+        id="input"
+        placeholder="Type your message..."
+        rows="1"
+        onkeydown="handleKey(event)"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button id="sendBtn" onclick="sendMessage()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Full conversation history maintained client-side (Vercel is stateless)
+    let history = [];
+    let waiting = false;
+
+    async function init() {
+      showTyping();
+      const res = await callApi(null);
+      hideTyping();
+      if (res.reply) {
+        history.push({ role: 'assistant', content: res.reply });
+        addMessage('assistant', res.reply);
+      }
+    }
+
+    function addMessage(role, text) {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.innerHTML = `
+        <div class="msg-avatar">${role === 'assistant' ? '🔗' : '👤'}</div>
+        <div class="bubble">${escapeHtml(text).replace(/\n/g, '<br>')}</div>
+      `;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function showTyping() {
+      const messages = document.getElementById('messages');
+      const div = document.createElement('div');
+      div.id = 'typing';
+      div.className = 'typing-indicator';
+      div.innerHTML = `
+        <div class="msg-avatar">🔗</div>
+        <div class="typing-dots"><span></span><span></span><span></span></div>
+      `;
+      messages.appendChild(div);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function hideTyping() {
+      const el = document.getElementById('typing');
+      if (el) el.remove();
+    }
+
+    async function callApi(userMessage) {
+      // Send full history so Vercel function has context (stateless)
+      const messages = userMessage
+        ? [...history, { role: 'user', content: userMessage }]
+        : history;
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages }),
+      });
+
+      if (!res.ok) throw new Error('API error');
+      return res.json();
+    }
+
+    async function sendMessage() {
+      if (waiting) return;
+      const input = document.getElementById('input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      addMessage('user', text);
+      history.push({ role: 'user', content: text });
+      input.value = '';
+      autoResize(input);
+      waiting = true;
+      document.getElementById('sendBtn').disabled = true;
+
+      showTyping();
+      try {
+        const res = await callApi(text);
+        // Note: callApi with text already appended user msg to messages array,
+        // but history was updated above — rebuild for next call
+        hideTyping();
+
+        if (res.reply) {
+          history.push({ role: 'assistant', content: res.reply });
+          addMessage('assistant', res.reply);
+        }
+
+        if (res.complete) {
+          document.getElementById('completeBanner').classList.add('show');
+          input.disabled = true;
+          document.getElementById('sendBtn').disabled = true;
+          return;
+        }
+      } catch (e) {
+        hideTyping();
+        addMessage('assistant', 'Something went wrong — please refresh and try again.');
+      }
+
+      waiting = false;
+      document.getElementById('sendBtn').disabled = false;
+      document.getElementById('input').focus();
+    }
+
+    function handleKey(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function autoResize(el) {
+      el.style.height = 'auto';
+      el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    init();
+  </script>
+</body>
+</html>
