@@ -199,6 +199,75 @@
 
     .complete-banner.show { display: block; }
 
+    /* Step 2 — LinkedIn login */
+    .step2 {
+      background: white;
+      border-radius: 0 0 16px 16px;
+      padding: 28px 24px;
+      border-top: 1px solid #e4e6eb;
+      display: none;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .step2.show { display: flex; }
+
+    .step2-header { text-align: center; }
+    .step2-header h2 { font-size: 18px; color: #1c1e21; margin-bottom: 6px; }
+    .step2-header p { font-size: 14px; color: #65676b; line-height: 1.5; }
+
+    .step2 .field { display: flex; flex-direction: column; gap: 6px; }
+    .step2 label { font-size: 13px; font-weight: 600; color: #444; }
+    .step2 input {
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .step2 input:focus { border-color: #0a66c2; }
+
+    .step2-note {
+      background: #f0f2f5;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #65676b;
+      line-height: 1.5;
+    }
+
+    .step2-btn {
+      background: #0a66c2;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .step2-btn:hover { background: #004182; }
+    .step2-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+    .step2-status {
+      text-align: center;
+      font-size: 14px;
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .step2-status.show { display: block; }
+    .step2-status.info { background: #e8f0fe; color: #1a73e8; }
+    .step2-status.success { background: #e6f4ea; color: #1e7e34; }
+    .step2-status.error { background: #fce8e6; color: #c5221f; }
+
+    .tfa-section { display: none; flex-direction: column; gap: 12px; }
+    .tfa-section.show { display: flex; }
+
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 3px; }
@@ -217,7 +286,7 @@
     <div class="chat-messages" id="messages"></div>
 
     <div class="complete-banner" id="completeBanner">
-      ✅ Setup complete! Your profile has been sent to the team. You'll hear from us shortly about next steps.
+      ✅ Campaign details saved. Scroll down to connect your LinkedIn account.
     </div>
 
     <div class="chat-input-area">
@@ -235,6 +304,41 @@
         </svg>
       </button>
     </div>
+  <!-- Step 2: LinkedIn login -->
+  <div class="step2" id="step2">
+    <div class="step2-header">
+      <h2>Step 2 — Connect your LinkedIn account</h2>
+      <p>Enter your LinkedIn login details below. Your credentials are used once to create a secure session and are never stored.</p>
+    </div>
+
+    <div class="field">
+      <label for="liEmail">LinkedIn email</label>
+      <input type="email" id="liEmail" placeholder="you@example.com" autocomplete="email" />
+    </div>
+
+    <div class="field">
+      <label for="liPassword">LinkedIn password</label>
+      <input type="password" id="liPassword" placeholder="Your LinkedIn password" autocomplete="current-password" />
+    </div>
+
+    <div class="step2-note">
+      🔒 Your credentials are sent over HTTPS and used only to log in. They are not saved anywhere after the session is created.
+    </div>
+
+    <button class="step2-btn" id="loginBtn" onclick="startLogin()">Connect LinkedIn Account</button>
+
+    <div class="step2-status" id="loginStatus"></div>
+
+    <!-- 2FA section — shown if LinkedIn requires verification -->
+    <div class="tfa-section" id="tfaSection">
+      <div class="field">
+        <label for="tfaCode">Verification code</label>
+        <input type="text" id="tfaCode" placeholder="Enter the code LinkedIn sent you" maxlength="10" inputmode="numeric" />
+      </div>
+      <button class="step2-btn" id="tfaBtn" onclick="submitTfa()">Submit Code</button>
+    </div>
+  </div>
+
   </div>
 
   <script>
@@ -324,9 +428,7 @@
         }
 
         if (res.complete) {
-          document.getElementById('completeBanner').classList.add('show');
-          input.disabled = true;
-          document.getElementById('sendBtn').disabled = true;
+          onIntakeComplete();
           return;
         }
       } catch (e) {
@@ -359,6 +461,152 @@
     }
 
     init();
+
+    // ── Step 2: LinkedIn Login ─────────────────────────────────────────────
+
+    let loginSessionId = null;
+    let loginNickname = null;
+    let pollInterval = null;
+
+    // Called when chat completes — show Step 2 and extract nickname from history
+    function showLoginStep() {
+      document.getElementById('step2').classList.add('show');
+      // Scroll to Step 2
+      setTimeout(() => {
+        document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
+      }, 400);
+
+      // Extract nickname from completed intake (last assistant message contains the name)
+      const lastAssistant = [...history].reverse().find(m => m.role === 'assistant');
+      if (lastAssistant) {
+        // Nickname will be set server-side from intake JSON — we store it on window
+        // for now derive from email field or leave blank (server derives from name)
+      }
+    }
+
+    async function startLogin() {
+      const email = document.getElementById('liEmail').value.trim();
+      const password = document.getElementById('liPassword').value.trim();
+
+      if (!email || !password) {
+        setLoginStatus('Please enter both your LinkedIn email and password.', 'error');
+        return;
+      }
+
+      // Derive nickname from email (server will use intake name — this is just for reference)
+      loginNickname = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 12);
+
+      document.getElementById('loginBtn').disabled = true;
+      setLoginStatus('Connecting to LinkedIn...', 'info');
+
+      try {
+        const res = await fetch('/api/login?action=start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname: loginNickname, email, password }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          setLoginStatus(data.error || 'Login failed. Please try again.', 'error');
+          document.getElementById('loginBtn').disabled = false;
+          return;
+        }
+
+        if (data.status === 'already_exists') {
+          setLoginStatus('✅ LinkedIn session already connected for this account!', 'success');
+          return;
+        }
+
+        loginSessionId = data.sessionId;
+        setLoginStatus('Logging in... please wait.', 'info');
+        startPolling();
+
+      } catch (err) {
+        setLoginStatus('Could not reach login service. Please try again.', 'error');
+        document.getElementById('loginBtn').disabled = false;
+      }
+    }
+
+    function startPolling() {
+      pollInterval = setInterval(async () => {
+        if (!loginSessionId) return;
+        try {
+          const res = await fetch(`/api/login?action=status&sessionId=${loginSessionId}`);
+          const data = await res.json();
+
+          if (data.status === 'need_2fa') {
+            clearInterval(pollInterval);
+            setLoginStatus('LinkedIn sent you a verification code. Enter it below.', 'info');
+            document.getElementById('tfaSection').classList.add('show');
+            document.getElementById('tfaCode').focus();
+
+          } else if (data.status === 'success') {
+            clearInterval(pollInterval);
+            setLoginStatus('✅ LinkedIn account connected successfully! Setup is complete.', 'success');
+            document.getElementById('loginBtn').disabled = true;
+            document.getElementById('tfaSection').classList.remove('show');
+
+          } else if (data.status === 'error') {
+            clearInterval(pollInterval);
+            setLoginStatus(data.message || 'Login failed. Please check your credentials and try again.', 'error');
+            document.getElementById('loginBtn').disabled = false;
+
+          } else if (data.status === 'verifying') {
+            setLoginStatus('Verifying code...', 'info');
+          } else {
+            setLoginStatus('Logging in... please wait.', 'info');
+          }
+        } catch (e) {
+          // Network hiccup — keep polling
+        }
+      }, 2000);
+    }
+
+    async function submitTfa() {
+      const code = document.getElementById('tfaCode').value.trim();
+      if (!code) return;
+
+      document.getElementById('tfaBtn').disabled = true;
+      setLoginStatus('Submitting verification code...', 'info');
+
+      try {
+        const res = await fetch('/api/login?action=verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: loginSessionId, code }),
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          setLoginStatus(data.error, 'error');
+          document.getElementById('tfaBtn').disabled = false;
+          return;
+        }
+
+        setLoginStatus('Verifying...', 'info');
+        startPolling(); // resume polling for final status
+
+      } catch (err) {
+        setLoginStatus('Error submitting code. Please try again.', 'error');
+        document.getElementById('tfaBtn').disabled = false;
+      }
+    }
+
+    function setLoginStatus(msg, type) {
+      const el = document.getElementById('loginStatus');
+      el.textContent = msg;
+      el.className = `step2-status show ${type}`;
+    }
+
+    // Override the complete handler to show Step 2 instead of just a banner
+    const _originalComplete = window._onComplete;
+    function onIntakeComplete() {
+      document.getElementById('completeBanner').classList.add('show');
+      document.getElementById('input').disabled = true;
+      document.getElementById('sendBtn').disabled = true;
+      showLoginStep();
+    }
   </script>
 </body>
 </html>
