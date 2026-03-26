@@ -126,7 +126,10 @@ module.exports = async function handler(req, res) {
       complete = true;
       try {
         const intake = JSON.parse(intakeMatch[1].trim());
-        await sendIntakeEmail(intake);
+        await Promise.all([
+          sendIntakeEmail(intake),
+          sendIntakeToWebhook(intake),
+        ]);
       } catch (e) {
         console.error('Failed to parse or send intake:', e.message);
       }
@@ -210,5 +213,34 @@ ${JSON.stringify(intake, null, 2)}`;
     console.error('Postmark error:', err);
   } else {
     console.log(`Intake email sent for ${intake.name}`);
+  }
+}
+
+async function sendIntakeToWebhook(intake) {
+  const webhookUrl = process.env.WEBHOOK_URL;
+  const webhookSecret = process.env.WEBHOOK_SECRET;
+  if (!webhookUrl || !webhookSecret) {
+    console.log('No webhook configured — skipping Mac Mini intake push');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${webhookUrl}/intake`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-secret': webhookSecret,
+      },
+      body: JSON.stringify({ intake }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('Webhook intake error:', err);
+    } else {
+      console.log(`Intake pushed to Mac Mini for ${intake.name}`);
+    }
+  } catch (err) {
+    console.error('Webhook intake failed:', err.message);
   }
 }
