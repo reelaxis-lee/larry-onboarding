@@ -32,6 +32,9 @@ SCOPE — what you collect:
    - Their unique angle or value proposition — what makes them different or relevant to their target?
    - Tone preference: formal, casual, direct, conversational?
    - Any specific talking points, pain points they address, or things to avoid saying?
+   - How do they like to open a cold message — with a question, a pain point, a direct offer, or something else?
+   - Message length preference: short and punchy (under 50 words), or a bit more context?
+   - What does a good cold message look like to them? Any examples or phrases they like / hate?
 
 4. CALL TO ACTION
    - What should happen after someone replies? (book a call, reply for more info, visit a page, etc.)
@@ -85,7 +88,10 @@ When you have collected everything across all 5 areas, summarize what you've gat
   "freeOffer": "Free audit / trial / mockup or null",
   "goals": "Booked discovery calls with SaaS founders",
   "timeline": "Ongoing or specific deadline",
-  "autoSignature": "Cheers, Jane or null"
+  "autoSignature": "Cheers, Jane or null",
+  "connectionOpener": "question / pain-point / direct-offer / other",
+  "messageLength": "short / medium",
+  "messagingNotes": "Any specific structural notes, phrases they like, phrases they hate, or examples they mentioned"
 }
 </INTAKE_COMPLETE>
 
