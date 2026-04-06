@@ -13,6 +13,16 @@ You are warm, professional, and conversational — not robotic. Ask one or two q
 
 ---
 
+WHAT THE SYSTEM DOES ON THEIR BEHALF:
+Once configured, the system will run daily on their LinkedIn account and:
+- Send personalized connection requests to their target ICP via Sales Navigator
+- Send InMails to open profiles (free — no InMail credit cost)
+- Follow up with new connections after 3 days with a personalized message
+- Check their inbox daily and reply to positive or neutral messages on their behalf
+Post engagement (likes, comments) is not part of the service — do not mention it.
+
+---
+
 SCOPE — what you collect:
 
 1. ACCOUNT DETAILS
@@ -27,9 +37,8 @@ SCOPE — what you collect:
    - Do they have LinkedIn Sales Navigator? If yes, ask them to go to Sales Navigator → Saved Searches → click their search → copy the URL from their browser and share it here.
    - If no Sales Nav, note that the team will set up an alternative.
 
-3. MESSAGING STRATEGY & ANGLE
-   - What they sell or offer
-   - Their unique angle or value proposition — what makes them different or relevant to their target?
+3. MESSAGING STRATEGY
+   - What they sell or offer, and their unique angle or value proposition — what makes them different or relevant to their target? Collect both together as a single picture of their offer.
    - Tone preference: formal, casual, direct, conversational?
    - Any specific talking points, pain points they address, or things to avoid saying?
    - How do they like to open a cold message — with a question, a pain point, a direct offer, or something else?
@@ -65,7 +74,7 @@ When you have collected everything across all 5 areas, summarize what you've gat
 
 <INTAKE_COMPLETE>
 {
-  "name": "Full Name",
+  "fullName": "Full Name",
   "linkedinUrl": "https://linkedin.com/in/...",
   "company": "Company Name",
   "email": "email@example.com",
@@ -74,12 +83,11 @@ When you have collected everything across all 5 areas, summarize what you've gat
   "icp": {
     "titles": ["CEO", "Founder", "Owner"],
     "industries": ["SaaS", "Professional Services"],
-    "companySize": "1-50 employees",
-    "geography": "United States"
+    "companySizes": ["1-50 employees"],
+    "geographies": ["United States"]
   },
   "salesNavUrl": "https://linkedin.com/sales/search/people?savedSearchId=... or null",
-  "offer": "What they sell",
-  "angle": "Their unique value prop / differentiator",
+  "offerDescription": "What they sell and their unique angle/differentiator — combined into one clear picture",
   "tone": "conversational, direct",
   "talkingPoints": ["point 1", "point 2"],
   "avoid": ["things not to say"],
@@ -91,7 +99,8 @@ When you have collected everything across all 5 areas, summarize what you've gat
   "autoSignature": "Cheers, Jane or null",
   "connectionOpener": "question / pain-point / direct-offer / other",
   "messageLength": "short / medium",
-  "messagingNotes": "Any specific structural notes, phrases they like, phrases they hate, or examples they mentioned"
+  "messagingNotes": "Any specific structural notes, phrases they like, phrases they hate, or examples they mentioned",
+  "dailyLimits": { "connections": 35, "messages": 35, "inmails": 5 }
 }
 </INTAKE_COMPLETE>
 
@@ -127,11 +136,17 @@ module.exports = async function handler(req, res) {
     // Check for completed intake
     const intakeMatch = reply.match(/<INTAKE_COMPLETE>([\s\S]*?)<\/INTAKE_COMPLETE>/);
     let complete = false;
+    let nickname = null;
 
     if (intakeMatch) {
       complete = true;
       try {
         const intake = JSON.parse(intakeMatch[1].trim());
+
+        // Derive nickname the same way webhook-server.js does:
+        // lowercase first name, alphanumeric only, max 12 chars
+        nickname = (intake.fullName || '').split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 12);
+
         await Promise.all([
           sendIntakeEmail(intake),
           sendIntakeToWebhook(intake),
@@ -146,7 +161,7 @@ module.exports = async function handler(req, res) {
       .replace(/<INTAKE_COMPLETE>[\s\S]*?<\/INTAKE_COMPLETE>/g, '')
       .trim();
 
-    return res.status(200).json({ reply: displayReply, complete });
+    return res.status(200).json({ reply: displayReply, complete, ...(nickname && { nickname }) });
   } catch (err) {
     console.error('Claude error:', err.message);
     return res.status(500).json({ error: 'Something went wrong. Please try again.' });
@@ -164,7 +179,7 @@ async function sendIntakeEmail(intake) {
   const body = `New LinkedIn automation profile submitted via intake chat.
 
 --- ACCOUNT ---
-Name: ${intake.name}
+Name: ${intake.fullName}
 LinkedIn: ${intake.linkedinUrl}
 Company: ${intake.company}
 Email: ${intake.email}
@@ -173,13 +188,12 @@ Timezone: ${intake.timezone} — ${intake.city}
 --- TARGETING ---
 Titles: ${(intake.icp?.titles || []).join(', ')}
 Industries: ${(intake.icp?.industries || []).join(', ')}
-Company size: ${intake.icp?.companySize}
-Geography: ${intake.icp?.geography}
+Company sizes: ${(intake.icp?.companySizes || []).join(', ')}
+Geographies: ${(intake.icp?.geographies || []).join(', ')}
 Sales Nav URL: ${intake.salesNavUrl || 'Not provided — team to configure'}
 
 --- MESSAGING ---
-Offer: ${intake.offer}
-Angle / value prop: ${intake.angle || 'Not specified'}
+Offer & angle: ${intake.offerDescription}
 Tone: ${intake.tone}
 Talking points: ${talkingPoints}
 Avoid: ${avoid}
@@ -209,7 +223,7 @@ ${JSON.stringify(intake, null, 2)}`;
     body: JSON.stringify({
       From: 'larry@getnarrow.ai',
       To: notifyEmail,
-      Subject: `New LinkedIn profile intake: ${intake.name} — ${intake.company}`,
+      Subject: `New LinkedIn profile intake: ${intake.fullName} — ${intake.company}`,
       TextBody: body,
     }),
   });
@@ -218,7 +232,7 @@ ${JSON.stringify(intake, null, 2)}`;
     const err = await response.text();
     console.error('Postmark error:', err);
   } else {
-    console.log(`Intake email sent for ${intake.name}`);
+    console.log(`Intake email sent for ${intake.fullName}`);
   }
 }
 
@@ -244,7 +258,7 @@ async function sendIntakeToWebhook(intake) {
       const err = await response.text();
       console.error('Webhook intake error:', err);
     } else {
-      console.log(`Intake pushed to Mac Mini for ${intake.name}`);
+      console.log(`Intake pushed to Mac Mini for ${intake.fullName}`);
     }
   } catch (err) {
     console.error('Webhook intake failed:', err.message);

@@ -428,6 +428,7 @@
         }
 
         if (res.complete) {
+          if (res.nickname) window.loginNickname = res.nickname;
           onIntakeComplete();
           return;
         }
@@ -493,8 +494,8 @@
         return;
       }
 
-      // Derive nickname from email (server will use intake name — this is just for reference)
-      loginNickname = email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 12);
+      // Use server-derived nickname (from intake fullName) if available; fall back to email prefix
+      loginNickname = window.loginNickname || email.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 12);
 
       document.getElementById('loginBtn').disabled = true;
       setLoginStatus('Connecting to LinkedIn...', 'info');
